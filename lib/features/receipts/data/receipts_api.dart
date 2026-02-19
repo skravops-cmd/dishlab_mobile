@@ -1,0 +1,48 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../../../core/config.dart'; // fixed import
+import '../models/receipt.dart';
+
+class ReceiptsApi {
+  /// Fetch last 10 receipts for dashboard
+  static Future<List<Receipt>> fetchDashboard(String token) async {
+    final response = await http.get(
+      Uri.parse("${AppConfig.apiBaseUrl}/api/receipts/dashboard"),
+      headers: {"Authorization": "Bearer $token", "Accept": "application/json"},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to fetch dashboard: ${response.body}");
+    }
+
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.map((e) => Receipt.fromJson(e)).toList();
+  }
+
+  /// Create new receipt
+  static Future<void> createReceipt({
+    required String token,
+    required String name,
+    required String cuisine,
+    required String ingredients,
+    required String youtubeLink,
+  }) async {
+    final response = await http.post(
+      Uri.parse("${AppConfig.apiBaseUrl}/api/receipts/"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "name": name,
+        "cuisine": cuisine,
+        "ingredients": ingredients,
+        "youtube_link": youtubeLink,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception("Failed to create receipt: ${response.body}");
+    }
+  }
+}
