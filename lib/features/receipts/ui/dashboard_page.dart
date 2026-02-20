@@ -71,10 +71,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         onPressed: () async {
                           final uri = Uri.parse(r.youtubeLink);
                           if (await canLaunchUrl(uri)) {
-                            await launchUrl(
-                              uri,
-                              mode: LaunchMode.externalApplication,
-                            );
+                            await launchUrl(uri);
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
