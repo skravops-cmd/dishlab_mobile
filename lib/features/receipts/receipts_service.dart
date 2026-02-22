@@ -24,4 +24,8 @@ class ReceiptsService {
       youtubeLink: youtubeLink,
     );
   }
+
+  Future<void> deleteReceipt(String receiptId) async {
+    await ReceiptsApi.deleteReceipt(token: token, receiptId: receiptId);
+  }
 }
