@@ -45,4 +45,19 @@ class ReceiptsApi {
       throw Exception("Failed to create receipt: ${response.body}");
     }
   }
+
+  /// Delete receipt
+  static Future<void> deleteReceipt({
+    required String token,
+    required String receiptId,
+  }) async {
+    final response = await http.delete(
+      Uri.parse("${AppConfig.apiBaseUrl}/api/receipts/$receiptId"),
+      headers: {"Authorization": "Bearer $token", "Accept": "application/json"},
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception("Failed to delete receipt: ${response.body}");
+    }
+  }
 }
