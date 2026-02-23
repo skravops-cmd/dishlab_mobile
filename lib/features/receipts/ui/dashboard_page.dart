@@ -4,6 +4,7 @@ import '../models/receipt.dart';
 import '../receipts_service.dart';
 import '../../auth/ui/login_page.dart';
 import 'create_receipt_page.dart';
+import 'edit_receipt_page.dart';
 
 class DashboardPage extends StatefulWidget {
   final String token;
@@ -165,6 +166,25 @@ class _DashboardPageState extends State<DashboardPage> {
                           IconButton(
                             icon: const Icon(Icons.play_circle_fill),
                             onPressed: () => _openYoutube(r.youtubeLink),
+                          ),
+
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => EditReceiptPage(
+                                    receipt: r,
+                                    service: _service,
+                                  ),
+                                ),
+                              );
+
+                              if (result == true) {
+                                _loadDashboard();
+                              }
+                            },
                           ),
 
                           // 🗑 Delete

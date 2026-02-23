@@ -28,4 +28,21 @@ class ReceiptsService {
   Future<void> deleteReceipt(String receiptId) async {
     await ReceiptsApi.deleteReceipt(token: token, receiptId: receiptId);
   }
+
+  Future<void> updateReceipt({
+    required String receiptId,
+    String? name,
+    String? cuisine,
+    String? ingredients,
+    String? youtubeLink,
+  }) async {
+    await ReceiptsApi.updateReceipt(
+      token: token,
+      receiptId: receiptId,
+      name: name,
+      cuisine: cuisine,
+      ingredients: ingredients,
+      youtubeLink: youtubeLink,
+    );
+  }
 }

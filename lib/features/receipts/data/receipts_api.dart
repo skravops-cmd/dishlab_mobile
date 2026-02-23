@@ -60,4 +60,32 @@ class ReceiptsApi {
       throw Exception("Failed to delete receipt: ${response.body}");
     }
   }
+
+  /// Update receipt
+  static Future<void> updateReceipt({
+    required String token,
+    required String receiptId,
+    String? name,
+    String? cuisine,
+    String? ingredients,
+    String? youtubeLink,
+  }) async {
+    final response = await http.put(
+      Uri.parse("${AppConfig.apiBaseUrl}/api/receipts/$receiptId"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        if (name != null) "name": name,
+        if (cuisine != null) "cuisine": cuisine,
+        if (ingredients != null) "ingredients": ingredients,
+        if (youtubeLink != null) "youtube_link": youtubeLink,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to update receipt: ${response.body}");
+    }
+  }
 }
