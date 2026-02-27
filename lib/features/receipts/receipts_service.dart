@@ -47,12 +47,14 @@ class ReceiptsService {
   }
 
   Future<List<Receipt>> searchReceipts({
-    required String ingredients,
+    String? ingredients,
+    String? cuisine,
     bool matchAll = false,
   }) async {
     return await ReceiptsApi.searchReceipts(
       token: token,
       ingredients: ingredients,
+      cuisine: cuisine,
       matchAll: matchAll,
     );
   }

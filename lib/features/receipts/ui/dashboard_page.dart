@@ -18,14 +18,22 @@ class _DashboardPageState extends State<DashboardPage> {
   late ReceiptsService _service;
 
   List<Receipt> _receipts = [];
-
   bool _loading = true;
   String? _error;
 
-  // 🔍 Search state
-  final TextEditingController _searchCtrl = TextEditingController();
+  // 🔍 Filters
+  final TextEditingController _ingredientCtrl = TextEditingController();
+  String? _selectedCuisine;
   bool _matchAll = false;
   bool _isSearching = false;
+
+  final List<String> _cuisineOptions = [
+    "italian",
+    "mexican",
+    "indian",
+    "chinese",
+    "american",
+  ];
 
   @override
   void initState() {
@@ -34,9 +42,6 @@ class _DashboardPageState extends State<DashboardPage> {
     _loadDashboard();
   }
 
-  // =============================
-  // LOAD DASHBOARD
-  // =============================
   Future<void> _loadDashboard() async {
     setState(() {
       _loading = true;
@@ -57,15 +62,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // =============================
-  // SEARCH
-  // =============================
   Future<void> _search() async {
-    if (_searchCtrl.text.trim().isEmpty) {
-      _loadDashboard();
-      return;
-    }
-
     setState(() {
       _loading = true;
       _error = null;
@@ -74,7 +71,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
     try {
       final results = await _service.searchReceipts(
-        ingredients: _searchCtrl.text.trim(),
+        ingredients: _ingredientCtrl.text.trim().isEmpty
+            ? null
+            : _ingredientCtrl.text.trim(),
+        cuisine: _selectedCuisine,
         matchAll: _matchAll,
       );
 
@@ -89,107 +89,35 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  void _clearSearch() {
-    _searchCtrl.clear();
+  void _clearFilters() {
+    _ingredientCtrl.clear();
+    _selectedCuisine = null;
     _matchAll = false;
     _loadDashboard();
   }
 
-  // =============================
-  // DELETE
-  // =============================
   Future<void> _deleteReceipt(int index) async {
     final receipt = _receipts[index];
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Delete Receipt"),
-        content: Text("Delete '${receipt.name}'?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      await _service.deleteReceipt(receipt.id);
-
-      if (!mounted) return;
-
-      setState(() {
-        _receipts.removeAt(index);
-      });
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Receipt deleted")));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Delete failed: $e")));
-    }
+    await _service.deleteReceipt(receipt.id);
+    if (!mounted) return;
+    setState(() => _receipts.removeAt(index));
   }
 
-  // =============================
-  // YOUTUBE
-  // =============================
   Future<void> _openYoutube(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Could not open link")));
     }
   }
 
-  // =============================
-  // LOGOUT
-  // =============================
   Future<void> _logout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Logout"),
-        content: const Text("Are you sure?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Logout"),
-          ),
-        ],
-      ),
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
     );
-
-    if (confirm == true) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-        (route) => false,
-      );
-    }
   }
 
-  // =============================
-  // UI
-  // =============================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -201,40 +129,56 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       body: Column(
         children: [
-          // 🔍 SEARCH SECTION
+          // 🔎 FILTER SECTION
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
                 TextField(
-                  controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: "Search ingredients (cheese,tomato)",
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _isSearching
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: _clearSearch,
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                  controller: _ingredientCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Ingredients (cheese,tomato)",
+                    border: OutlineInputBorder(),
                   ),
-                  onSubmitted: (_) => _search(),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+
+                DropdownButtonFormField<String>(
+                  value: _selectedCuisine,
+                  decoration: const InputDecoration(
+                    labelText: "Cuisine",
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _cuisineOptions
+                      .map(
+                        (c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c.toUpperCase()),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setState(() => _selectedCuisine = value),
+                ),
+
+                const SizedBox(height: 10),
+
                 Row(
                   children: [
                     Checkbox(
                       value: _matchAll,
                       onChanged: (v) => setState(() => _matchAll = v ?? false),
                     ),
-                    const Text("Match ALL"),
+                    const Text("Match ALL ingredients"),
                     const Spacer(),
                     ElevatedButton(
-                      onPressed: _loading ? null : _search,
+                      onPressed: _search,
                       child: const Text("Search"),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: _clearFilters,
+                      child: const Text("Clear"),
                     ),
                   ],
                 ),
@@ -242,30 +186,22 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
 
-          // 📋 LIST SECTION
+          // 📋 LIST
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: _isSearching ? _search : _loadDashboard,
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                  ? Center(child: Text("Error: $_error"))
-                  : _receipts.isEmpty
-                  ? Center(
-                      child: Text(
-                        _isSearching
-                            ? "No matching receipts"
-                            : "No receipts yet",
-                      ),
-                    )
-                  : ListView.builder(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? Center(child: Text("Error: $_error"))
+                : _receipts.isEmpty
+                ? const Center(child: Text("No results"))
+                : RefreshIndicator(
+                    onRefresh: _isSearching ? _search : _loadDashboard,
+                    child: ListView.builder(
                       padding: const EdgeInsets.all(12),
                       itemCount: _receipts.length,
                       itemBuilder: (context, index) {
                         final r = _receipts[index];
-
                         return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 6),
                           child: ListTile(
                             title: Text(r.name),
                             subtitle: Text(
@@ -311,7 +247,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         );
                       },
                     ),
-            ),
+                  ),
           ),
         ],
       ),

@@ -89,16 +89,26 @@ class ReceiptsApi {
     }
   }
 
-  /// Search receipts by ingredients
+  /// Search receipts with optional filters
   static Future<List<Receipt>> searchReceipts({
     required String token,
-    required String ingredients,
+    String? ingredients,
+    String? cuisine,
     bool matchAll = false,
   }) async {
-    final queryParams = {
-      "ingredients": ingredients,
-      if (matchAll) "match_all": "true",
-    };
+    final queryParams = <String, String>{};
+
+    if (ingredients != null && ingredients.trim().isNotEmpty) {
+      queryParams["ingredients"] = ingredients.trim();
+    }
+
+    if (cuisine != null && cuisine.trim().isNotEmpty) {
+      queryParams["cuisine"] = cuisine.trim().toLowerCase();
+    }
+
+    if (matchAll) {
+      queryParams["match_all"] = "true";
+    }
 
     final uri = Uri.parse(
       "${AppConfig.apiBaseUrl}/api/receipts/search",
