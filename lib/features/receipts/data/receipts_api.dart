@@ -88,4 +88,32 @@ class ReceiptsApi {
       throw Exception("Failed to update receipt: ${response.body}");
     }
   }
+
+  /// Search receipts by ingredients
+  static Future<List<Receipt>> searchReceipts({
+    required String token,
+    required String ingredients,
+    bool matchAll = false,
+  }) async {
+    final queryParams = {
+      "ingredients": ingredients,
+      if (matchAll) "match_all": "true",
+    };
+
+    final uri = Uri.parse(
+      "${AppConfig.apiBaseUrl}/api/receipts/search",
+    ).replace(queryParameters: queryParams);
+
+    final response = await http.get(
+      uri,
+      headers: {"Authorization": "Bearer $token", "Accept": "application/json"},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Search failed: ${response.body}");
+    }
+
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.map((e) => Receipt.fromJson(e)).toList();
+  }
 }

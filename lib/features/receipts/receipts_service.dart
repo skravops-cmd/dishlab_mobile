@@ -45,4 +45,15 @@ class ReceiptsService {
       youtubeLink: youtubeLink,
     );
   }
+
+  Future<List<Receipt>> searchReceipts({
+    required String ingredients,
+    bool matchAll = false,
+  }) async {
+    return await ReceiptsApi.searchReceipts(
+      token: token,
+      ingredients: ingredients,
+      matchAll: matchAll,
+    );
+  }
 }
