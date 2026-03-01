@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../auth/ui/login_page.dart';
 import '../models/receipt.dart';
 import '../receipts_service.dart';
-import '../../auth/ui/login_page.dart';
 import 'create_receipt_page.dart';
 import 'edit_receipt_page.dart';
+import 'widgets/receipt_card.dart';
 
 class DashboardPage extends StatefulWidget {
   final String token;
+
   const DashboardPage({super.key, required this.token});
 
   @override
@@ -15,13 +16,13 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  late ReceiptsService _service;
+  late final ReceiptsService _service;
 
   List<Receipt> _receipts = [];
   bool _loading = true;
   String? _error;
 
-  // 🔍 Filters
+  // 🔎 Filters
   final TextEditingController _ingredientCtrl = TextEditingController();
   String? _selectedCuisine;
   bool _matchAll = false;
@@ -29,60 +30,49 @@ class _DashboardPageState extends State<DashboardPage> {
 
   final List<String> _cuisineOptions = [
     "italian",
+    "asian",
     "mexican",
     "indian",
-    "chinese",
     "american",
+    "french",
+    "mediterranean",
   ];
 
   @override
   void initState() {
     super.initState();
     _service = ReceiptsService(token: widget.token);
-    _loadDashboard();
+    _fetchData();
   }
 
-  Future<void> _loadDashboard() async {
+  Future<void> _fetchData({bool isSearch = false}) async {
     setState(() {
       _loading = true;
       _error = null;
-      _isSearching = false;
     });
 
     try {
-      final data = await _service.getDashboard();
+      final data = isSearch
+          ? await _service.searchReceipts(
+              ingredients: _ingredientCtrl.text.trim().isEmpty
+                  ? null
+                  : _ingredientCtrl.text.trim(),
+              cuisine: _selectedCuisine,
+              matchAll: _matchAll,
+            )
+          : await _service.getDashboard();
+
       if (!mounted) return;
-      setState(() => _receipts = data);
+
+      setState(() {
+        _receipts = data;
+        _isSearching = isSearch;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
-    } finally {
-      if (!mounted) return;
-      setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _search() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-      _isSearching = true;
-    });
-
-    try {
-      final results = await _service.searchReceipts(
-        ingredients: _ingredientCtrl.text.trim().isEmpty
-            ? null
-            : _ingredientCtrl.text.trim(),
-        cuisine: _selectedCuisine,
-        matchAll: _matchAll,
-      );
-
-      if (!mounted) return;
-      setState(() => _receipts = results);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() {
+        _error = "Failed to load recipes. Please try again.";
+      });
     } finally {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -91,26 +81,14 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _clearFilters() {
     _ingredientCtrl.clear();
-    _selectedCuisine = null;
-    _matchAll = false;
-    _loadDashboard();
+    setState(() {
+      _selectedCuisine = null;
+      _matchAll = false;
+    });
+    _fetchData();
   }
 
-  Future<void> _deleteReceipt(int index) async {
-    final receipt = _receipts[index];
-    await _service.deleteReceipt(receipt.id);
-    if (!mounted) return;
-    setState(() => _receipts.removeAt(index));
-  }
-
-  Future<void> _openYoutube(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
-  }
-
-  Future<void> _logout() async {
+  void _logout() {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginPage()),
@@ -118,153 +96,186 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Future<void> _navigateToForm({Receipt? receipt}) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => receipt == null
+            ? CreateReceiptPage(service: _service)
+            : EditReceiptPage(receipt: receipt, service: _service),
+      ),
+    );
+
+    if (result == true) {
+      _fetchData(isSearch: _isSearching);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Dashboard"),
+        title: const Text("My Kitchen Lab"),
+        centerTitle: true,
         actions: [
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: _logout,
+          ),
         ],
       ),
       body: Column(
         children: [
-          // 🔎 FILTER SECTION
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _ingredientCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "Ingredients (cheese,tomato)",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                DropdownButtonFormField<String>(
-                  value: _selectedCuisine,
-                  decoration: const InputDecoration(
-                    labelText: "Cuisine",
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _cuisineOptions
-                      .map(
-                        (c) => DropdownMenuItem(
-                          value: c,
-                          child: Text(c.toUpperCase()),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) =>
-                      setState(() => _selectedCuisine = value),
-                ),
-
-                const SizedBox(height: 10),
-
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _matchAll,
-                      onChanged: (v) => setState(() => _matchAll = v ?? false),
-                    ),
-                    const Text("Match ALL ingredients"),
-                    const Spacer(),
-                    ElevatedButton(
-                      onPressed: _search,
-                      child: const Text("Search"),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: _clearFilters,
-                      child: const Text("Clear"),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // 📋 LIST
+          _buildFilterSection(),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                ? Center(child: Text("Error: $_error"))
+                ? _buildErrorWidget()
                 : _receipts.isEmpty
-                ? const Center(child: Text("No results"))
-                : RefreshIndicator(
-                    onRefresh: _isSearching ? _search : _loadDashboard,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _receipts.length,
-                      itemBuilder: (context, index) {
-                        final r = _receipts[index];
-                        return Card(
-                          child: ListTile(
-                            title: Text(r.name),
-                            subtitle: Text(
-                              "${r.cuisine} • ${r.ingredients.join(", ")}",
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.play_circle_fill),
-                                  onPressed: () => _openYoutube(r.youtubeLink),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () async {
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => EditReceiptPage(
-                                          receipt: r,
-                                          service: _service,
-                                        ),
-                                      ),
-                                    );
-
-                                    if (result == true) {
-                                      _isSearching
-                                          ? _search()
-                                          : _loadDashboard();
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () => _deleteReceipt(index),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                ? _buildEmptyWidget()
+                : _buildReceiptList(),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CreateReceiptPage(service: _service),
-            ),
-          );
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _navigateToForm(),
+        label: const Text("Add Recipe"),
+        icon: const Icon(Icons.add),
+      ),
+    );
+  }
 
-          if (result == true) {
-            _isSearching ? _search() : _loadDashboard();
-          }
+  // ================================
+  // FILTER SECTION
+  // ================================
+
+  Widget _buildFilterSection() {
+    return Card(
+      margin: const EdgeInsets.all(12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ExpansionTile(
+        title: Text(_isSearching ? "Filters Active" : "Search & Filter"),
+        leading: Icon(
+          Icons.filter_list,
+          color: _isSearching ? Colors.orange : null,
+        ),
+        childrenPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 8,
+        ),
+        children: [
+          TextField(
+            controller: _ingredientCtrl,
+            decoration: const InputDecoration(
+              labelText: "Ingredients",
+              hintText: "e.g. cheese, tomato",
+              prefixIcon: Icon(Icons.restaurant_menu),
+            ),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _selectedCuisine,
+            decoration: const InputDecoration(labelText: "Cuisine Type"),
+            items: _cuisineOptions
+                .map(
+                  (c) =>
+                      DropdownMenuItem(value: c, child: Text(c.toUpperCase())),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => _selectedCuisine = v),
+          ),
+          Row(
+            children: [
+              Checkbox(
+                value: _matchAll,
+                onChanged: (v) => setState(() => _matchAll = v ?? false),
+              ),
+              const Text("Match all ingredients"),
+              const Spacer(),
+              TextButton(onPressed: _clearFilters, child: const Text("Reset")),
+              ElevatedButton(
+                onPressed: () => _fetchData(isSearch: true),
+                child: const Text("Apply"),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================================
+  // RECEIPT LIST
+  // ================================
+
+  Widget _buildReceiptList() {
+    return RefreshIndicator(
+      onRefresh: () => _fetchData(isSearch: _isSearching),
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: _receipts.length,
+        itemBuilder: (context, index) {
+          final receipt = _receipts[index];
+
+          return ReceiptCard(
+            receipt: receipt,
+            service: _service,
+            onRefresh: () => _fetchData(isSearch: _isSearching),
+          );
         },
-        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  // ================================
+  // EMPTY STATE
+  // ================================
+
+  Widget _buildEmptyWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.search_off, size: 64, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            "No recipes found.",
+            style: TextStyle(fontSize: 18, color: Colors.grey),
+          ),
+          if (_isSearching)
+            TextButton(
+              onPressed: _clearFilters,
+              child: const Text("Clear Filters"),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ================================
+  // ERROR STATE
+  // ================================
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 48),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(_error!, textAlign: TextAlign.center),
+          ),
+          ElevatedButton(
+            onPressed: () => _fetchData(),
+            child: const Text("Retry"),
+          ),
+        ],
       ),
     );
   }
